@@ -47,6 +47,7 @@ type Builder struct {
 	watchRequest   []watchRequest
 	config         *rest.Config
 	ctrl           controller.Controller
+	threadiness    int
 }
 
 // SimpleController returns a new Builder.
@@ -112,6 +113,11 @@ func (blder *Builder) WithManager(m manager.Manager) *Builder {
 	return blder
 }
 
+func (blder *Builder) WithMaxConcurrentReconciles(i int) *Builder  {
+    blder.threadiness = i
+    return blder
+}
+
 // WithEventFilter sets the event filters, to filter which create/update/delete/generic events eventually
 // trigger reconciliations.  For example, filtering on whether the resource version has changed.
 // Defaults to the empty list.
@@ -144,7 +150,7 @@ func (blder *Builder) Build(r reconcile.Reconciler) (manager.Manager, error) {
 	}
 
 	// Set the ControllerManagedBy
-	if err := blder.doController(r); err != nil {
+	if err := blder.doController(r, blder.threadiness); err != nil {
 		return nil, err
 	}
 
@@ -210,11 +216,11 @@ func (blder *Builder) getControllerName() (string, error) {
 	return name, nil
 }
 
-func (blder *Builder) doController(r reconcile.Reconciler) error {
+func (blder *Builder) doController(r reconcile.Reconciler, i int) error {
 	name, err := blder.getControllerName()
 	if err != nil {
 		return err
 	}
-	blder.ctrl, err = newController(name, blder.mgr, controller.Options{Reconciler: r})
+	blder.ctrl, err = newController(name, blder.mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: i})
 	return err
 }
